@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+# Script to convert powerpoint to pdf
+
+# Function to show usage
+show_usage() {
+    echo "Usage: pptxTopdf [directory | file1.pptx file2.pptx ...]"
+    echo ""
+    echo "Examples:"
+    echo "  pptxTopdf .             # Convert all pptx in current folder"
+    echo "  pptxTopdf lab1.pptx     # Convert specific file"
+    echo "  pptxTopdf *.pptx        # Convert all pptx using wildcard"
+}
+
+# 1. Check if any arguments were provided
+if [ $# -eq 0 ]; then
+    show_usage
+    exit 1
+fi
+
+FILES_TO_PROCESS=()
+
+if [ "$1" == "." ]; then
+    # Expand current directory
+    shopt -s nullglob
+    FILES_TO_PROCESS=(*.pptx)
+elif [ -d "$1" ]; then
+    # If the first argument is a directory other than '.'
+    shopt -s nullglob
+    FILES_TO_PROCESS=("$1"/*.pptx)
+else
+    # Treat arguments as a list of files
+    for arg in "$@"; do
+        if [[ "$arg" == *.pptx ]]; then
+            FILES_TO_PROCESS+=("$arg")
+        else
+            echo "Skipping $arg (not a .pptx file)"
+        fi
+    done
+fi
+
+# 3. Check if we found anything
+if [ ${#FILES_TO_PROCESS[@]} -eq 0 ]; then
+    echo "Error: No .pptx files found."
+    exit 1
+fi
+
+# 4. Loop and Convert
+for file in "${FILES_TO_PROCESS[@]}"; do
+    # Get absolute paths (required for AppleScript)
+    ABS_PATH=$(realpath "$file")
+    DIR_PATH=$(dirname "$ABS_PATH")
+    BASE_NAME=$(basename "$file" .pptx)
+    ABS_OUT="$DIR_PATH/$BASE_NAME.pdf"
+
+    echo "Converting: $file -> $BASE_NAME.pdf"
+
+    osascript -e "tell application \"Keynote\"
+        activate
+        try
+            set theDoc to open POSIX file \"$ABS_PATH\"
+            delay 0.5
+            export theDoc to POSIX file \"$ABS_OUT\" as PDF
+            close theDoc saving no
+        on error errMsg
+            log \"Error converting $file: \" & errMsg
+        end try
+    end tell"
+done
+
+echo "Done! Processed ${#FILES_TO_PROCESS[@]} file(s)."

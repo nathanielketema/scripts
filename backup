@@ -1,0 +1,52 @@
+#!/usr/bin/env bun
+
+import { $ } from "bun";
+
+const source = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDocs/`;
+const backup = `${process.env.HOME}/.backup/`;
+
+const folders = ["personal", "school", "work"];
+
+console.log("Starting Sync...");
+
+try {
+  const exists = await $`ls ${backup}`.quiet().nothrow();
+  if (exists.exitCode !== 0) {
+    throw new Error("Backup directory not found!");
+  }
+
+  for (const folder of folders) {
+    const src = `${source}${folder}/`;
+    const dest = `${backup}${folder}/`;
+    
+    console.log(`Syncing ${folder}...`);
+    await $`rsync -av --delete \
+      --exclude='.git' \
+      --exclude='node_modules' \
+      --exclude='.zig-cache' \
+      --exclude='__pycache__' \
+      --exclude='.pytest_cache' \
+      --exclude='*.pyc' \
+      --exclude='.DS_Store' \
+      ${src} ${dest}`;
+  }
+
+  console.log("Committing to git...");
+  process.chdir(backup);
+
+  await $`git config advice.addEmbeddedRepo false`.quiet().nothrow();
+  await $`git add .`;
+  
+  // Only commit if there are actually changes to avoid "empty" commits
+  const status = await $`git status --porcelain`.text();
+  if (status.length > 0) {
+    const date = new Date().toLocaleString();
+    await $`git commit -m "Backup: ${date}"`;
+    console.log("Success..backup complete and committed.");
+  } else {
+    console.log("Success..no changes detected. Git is already up to date.");
+  }
+} catch (err) {
+  console.error(`Fail..Backup failed: ${err.message}`);
+  process.exit(1);
+}

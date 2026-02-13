@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# Script to convert Docs to pdf
+
+# Function to show usage
+show_usage() {
+    echo "Usage: docsTopdf [directory | file1.docx file2.pages ...]"
+    echo ""
+    echo "Examples:"
+    echo "  docsTopdf .             # Convert all docs in current folder"
+    echo "  docsTopdf report.docx   # Convert specific file"
+    echo "  docsTopdf *.docx        # Convert all docx using wildcard"
+}
+
+# 1. Check if any arguments were provided
+if [ $# -eq 0 ]; then
+    show_usage
+    exit 1
+fi
+
+FILES_TO_PROCESS=()
+
+# 2. Determine file list
+if [ "$1" == "." ] || [ -d "$1" ]; then
+    # Expand directory (defaults to current if .)
+    SEARCH_DIR="${1:-.}"
+    shopt -s nullglob
+    # Capture both Word and Pages formats
+    for f in "$SEARCH_DIR"/*.{docx,doc,pages}; do
+        FILES_TO_PROCESS+=("$f")
+    done
+else
+    # Treat arguments as a list of files
+    for arg in "$@"; do
+        if [[ "$arg" == *.docx || "$arg" == *.doc || "$arg" == *.pages ]]; then
+            FILES_TO_PROCESS+=("$arg")
+        else
+            echo "Skipping $arg (not a supported document format)"
+        fi
+    done
+fi
+
+# 3. Check if we found anything
+if [ ${#FILES_TO_PROCESS[@]} -eq 0 ]; then
+    echo "Error: No supported document files found."
+    exit 1
+fi
+
+# 4. Loop and Convert
+for file in "${FILES_TO_PROCESS[@]}"; do
+    # Get absolute paths (required for AppleScript)
+    ABS_PATH=$(realpath "$file")
+    DIR_PATH=$(dirname "$ABS_PATH")
+    # Remove extension for the base name
+    FILENAME=$(basename "$file")
+    BASE_NAME="${FILENAME%.*}"
+    ABS_OUT="$DIR_PATH/$BASE_NAME.pdf"
+
+    echo "Converting: $file -> $BASE_NAME.pdf"
+
+    osascript -e "tell application \"Pages\"
+        activate
+        try
+            set theDoc to open POSIX file \"$ABS_PATH\"
+            delay 0.5
+            export theDoc to POSIX file \"$ABS_OUT\" as PDF
+            close theDoc saving no
+        on error errMsg
+            log \"Error converting $file: \" & errMsg
+        end try
+    end tell"
+done
+
+echo "Done! Processed ${#FILES_TO_PROCESS[@]} file(s)."
