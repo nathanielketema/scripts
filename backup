@@ -24,6 +24,7 @@ try {
       --exclude='.git' \
       --exclude='node_modules' \
       --exclude='.zig-cache' \
+      --exclude='zig-pkg' \
       --exclude='__pycache__' \
       --exclude='.pytest_cache' \
       --exclude='*.pyc' \
