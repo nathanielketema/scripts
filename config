@@ -7,9 +7,10 @@ const command = process.argv[2];
 if (command === "brew") {
   await $`brew update`;
   await $`brew bundle install --global --cleanup --zap --upgrade`;
+  await $`brew cleanup --prune=all`;
 } else {
   console.log("Usage: config <command>\n");
   console.log("Available commands:");
-  console.log("    brew - Run brew bundle install");
+  console.log("    brew - Run brew update and brew bundle install --cleanup");
   process.exit(1);
 }
