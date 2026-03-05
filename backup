@@ -10,17 +10,17 @@ const folders = ["personal", "school", "work"];
 console.log("Starting Sync...");
 
 try {
-  const exists = await $`ls ${backup}`.quiet().nothrow();
-  if (exists.exitCode !== 0) {
-    throw new Error("Backup directory not found!");
-  }
+    const exists = await $`ls ${backup}`.quiet().nothrow();
+    if (exists.exitCode !== 0) {
+        throw new Error("Backup directory not found!");
+    }
 
-  for (const folder of folders) {
-    const src = `${source}${folder}/`;
-    const dest = `${backup}${folder}/`;
-    
-    console.log(`Syncing ${folder}...`);
-    await $`rsync -av --delete \
+    for (const folder of folders) {
+        const src = `${source}${folder}/`;
+        const dest = `${backup}${folder}/`;
+
+        console.log(`Syncing ${folder}...`);
+        await $`rsync -av --delete \
       --exclude='.git' \
       --exclude='node_modules' \
       --exclude='.zig-cache' \
@@ -30,24 +30,25 @@ try {
       --exclude='*.pyc' \
       --exclude='.DS_Store' \
       ${src} ${dest}`;
-  }
+    }
 
-  console.log("Committing to git...");
-  process.chdir(backup);
+    console.log("Committing to git...");
+    process.chdir(backup);
 
-  await $`git config advice.addEmbeddedRepo false`.quiet().nothrow();
-  await $`git add .`;
-  
-  // Only commit if there are actually changes to avoid "empty" commits
-  const status = await $`git status --porcelain`.text();
-  if (status.length > 0) {
-    const date = new Date().toLocaleString();
-    await $`git commit -m "Backup: ${date}"`;
-    console.log("Success..backup complete and committed.");
-  } else {
-    console.log("Success..no changes detected. Git is already up to date.");
-  }
+    await $`git config advice.addEmbeddedRepo false`.nothrow().quiet();
+    await $`git config core.safecrlf false`.nothrow().quiet();
+    await $`git add .`.quiet();
+
+    // Only commit if there are actually changes to avoid "empty" commits
+    const status = await $`git status --porcelain`.text();
+    if (status.length > 0) {
+        const date = new Date().toLocaleString();
+        await $`git commit -m "Backup: ${date}"`;
+        console.log("Success..backup complete and committed.");
+    } else {
+        console.log("Success..no changes detected. Git is already up to date.");
+    }
 } catch (err) {
-  console.error(`Fail..Backup failed: ${err.message}`);
-  process.exit(1);
+    console.error(`Fail..Backup failed: ${err.message}`);
+    process.exit(1);
 }
