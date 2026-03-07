@@ -5,7 +5,7 @@ import { $ } from "bun";
 const source = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDocs/`;
 const backup = `${process.env.HOME}/.backup/`;
 
-const folders = ["personal", "school", "work"];
+const folders = ["personal", "school", "work", "misc"];
 
 console.log("Starting Sync...");
 

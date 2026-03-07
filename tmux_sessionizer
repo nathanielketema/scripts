@@ -8,10 +8,8 @@ else
         "$HOME/personal/" \
         "$HOME/school/" \
         "$HOME/work/" \
-        "$HOME/.dotfiles/" \
-        "$HOME/personal/second_brain/" \
-        "$HOME/personal/second-brain/notes/" \
-        "$HOME/personal/second-brain/files/" \
+        "$HOME/misc/" \
+        "$HOME/personal/notes/" \
         "$HOME/school/dsu/3-spring-2026/" \
         -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf)
 fi
