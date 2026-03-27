@@ -1,23 +1,40 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
+import { readdir } from "node:fs/promises";
+
+const dotfiles_repo_url = "git@github.com:nathanielketema/.dotfiles.git";
+const dotfiles_path = `${process.env.HOME}/.dotfiles`;
 
 await main();
 
 async function main(): Promise<void> {
-    if (Bun.argv.length != 3) {
+    if (Bun.argv.length !== 3) {
         help();
         process.exit(1);
     }
+
     const command = Bun.argv[2];
 
     switch (command) {
+        case "setup":
+            await setup();
+            break;
         case "brew":
             await brew();
+            break;
+        case "stow":
+            await stow();
             break;
         default:
             help();
     }
+}
+
+async function setup(): Promise<void> {
+    await clone_dotfiles();
+    await stow();
+    await brew();
 }
 
 async function brew(): Promise<void> {
@@ -28,8 +45,45 @@ async function brew(): Promise<void> {
     await $`brew cleanup --prune=all`;
 }
 
+async function stow(): Promise<void> {
+    const directory_names = await get_stow_directory_names();
+
+    for (const directory_name of directory_names) {
+        await $`stow ${directory_name}`.cwd(dotfiles_path);
+    }
+}
+
+async function clone_dotfiles(): Promise<void> {
+    try {
+        await $`git clone ${dotfiles_repo_url} ${dotfiles_path}`.quiet();
+    } catch {
+        throw new Error(`Failed to clone dotfiles into ${dotfiles_path}`);
+    }
+
+    return;
+}
+
+async function get_stow_directory_names(): Promise<string[]> {
+    const entries = await readdir(dotfiles_path, { withFileTypes: true });
+
+    return entries
+        .filter((entry) => entry.isDirectory())
+        .filter((entry) => !entry.name.startsWith("."))
+        .map((entry) => entry.name)
+        .sort((left_name, right_name) => left_name.localeCompare(right_name));
+}
+
 function help(): void {
     console.log("Usage: config <command>\n");
     console.log("Available commands:");
+    console.log("    setup - Clones ~/.dotfiles if needed, then runs stow and brew");
     console.log("    brew - Keeps all packages and casks upto date with the Brewfile");
+    console.log("    stow - Runs stow for each top-level directory inside ~/.dotfiles");
+
+    console.log(`
+Before running "config setup", make sure you do the below:
+- Download homebrew, stow
+- mkdir (personal, school, work, misc)
+- mv scripts ~/personal/scripts/
+    `);
 }
