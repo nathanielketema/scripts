@@ -1,71 +1,102 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bun
 
-# Script to convert powerpoint to pdf
+import { $ } from "bun";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
-# Function to show usage
-show_usage() {
-    echo "Usage: pptxTopdf [directory | file1.pptx file2.pptx ...]"
-    echo ""
-    echo "Examples:"
-    echo "  pptxTopdf .             # Convert all pptx in current folder"
-    echo "  pptxTopdf lab1.pptx     # Convert specific file"
-    echo "  pptxTopdf *.pptx        # Convert all pptx using wildcard"
+type App_name = "Keynote";
+
+const supported_extensions = new Set([".pptx"]);
+
+await main();
+
+async function main(): Promise<void> {
+    const args = process.argv.slice(2);
+
+    if (args.length === 0) {
+        show_usage();
+        process.exit(1);
+    }
+
+    const files_to_process = await collect_files(args);
+    if (files_to_process.length === 0) {
+        console.error("Error: No .pptx files found.");
+        process.exit(1);
+    }
+
+    try {
+        for (const file_path of files_to_process) {
+            await convert_file(file_path);
+        }
+
+        console.log(`Done! Processed ${files_to_process.length} file(s).`);
+    } finally {
+        await close_app("Keynote");
+    }
 }
 
-# 1. Check if any arguments were provided
-if [ $# -eq 0 ]; then
-    show_usage
-    exit 1
-fi
+function show_usage(): void {
+    console.log("Usage: ptp [directory | file1.pptx file2.pptx ...]");
+    console.log("");
+    console.log("Examples:");
+    console.log("  ptp .             # Convert all pptx in current folder");
+    console.log("  ptp lab1.pptx     # Convert specific file");
+    console.log("  ptp *.pptx        # Convert all pptx using wildcard");
+}
 
-FILES_TO_PROCESS=()
+function get_output_path(input_path: string): string {
+    const parsed_path = path.parse(input_path);
+    return path.join(parsed_path.dir, `${parsed_path.name}.pdf`);
+}
 
-if [ "$1" == "." ]; then
-    # Expand current directory
-    shopt -s nullglob
-    FILES_TO_PROCESS=(*.pptx)
-elif [ -d "$1" ]; then
-    # If the first argument is a directory other than '.'
-    shopt -s nullglob
-    FILES_TO_PROCESS=("$1"/*.pptx)
-else
-    # Treat arguments as a list of files
-    for arg in "$@"; do
-        if [[ "$arg" == *.pptx ]]; then
-            FILES_TO_PROCESS+=("$arg")
-        else
-            echo "Skipping $arg (not a .pptx file)"
-        fi
-    done
-fi
+async function collect_directory_files(directory_path: string): Promise<string[]> {
+    const entries = await Array.fromAsync(new Bun.Glob("*.pptx").scan({ cwd: directory_path, onlyFiles: true }));
+    return entries.map((entry) => path.join(directory_path, entry));
+}
 
-# 3. Check if we found anything
-if [ ${#FILES_TO_PROCESS[@]} -eq 0 ]; then
-    echo "Error: No .pptx files found."
-    exit 1
-fi
+async function collect_files(argv: string[]): Promise<string[]> {
+    if (argv.length === 0) {
+        return [];
+    }
 
-# 4. Loop and Convert
-for file in "${FILES_TO_PROCESS[@]}"; do
-    # Get absolute paths (required for AppleScript)
-    ABS_PATH=$(realpath "$file")
-    DIR_PATH=$(dirname "$ABS_PATH")
-    BASE_NAME=$(basename "$file" .pptx)
-    ABS_OUT="$DIR_PATH/$BASE_NAME.pdf"
+    const first_arg = argv[0];
+    if (first_arg === "." || existsSync(first_arg) && (await Bun.file(first_arg).stat()).isDirectory()) {
+        const directory_path = path.resolve(first_arg === "." ? "." : first_arg);
+        return collect_directory_files(directory_path);
+    }
 
-    echo "Converting: $file -> $BASE_NAME.pdf"
+    const files_to_process: string[] = [];
+    for (const arg of argv) {
+        if (supported_extensions.has(path.extname(arg).toLowerCase())) {
+            files_to_process.push(path.resolve(arg));
+        } else {
+            console.log(`Skipping ${arg} (not a .pptx file)`);
+        }
+    }
 
-    osascript -e "tell application \"Keynote\"
-        activate
-        try
-            set theDoc to open POSIX file \"$ABS_PATH\"
+    return files_to_process;
+}
+
+async function close_app(app_name: App_name): Promise<void> {
+    await $`osascript -e ${`
+        if application "${app_name}" is running then
+            tell application "${app_name}" to quit
+        end if
+    `}`.quiet().nothrow();
+}
+
+async function convert_file(input_path: string): Promise<void> {
+    const absolute_input_path = path.resolve(input_path);
+    const output_path = get_output_path(absolute_input_path);
+
+    console.log(`Converting: ${absolute_input_path} -> ${path.basename(output_path)}`);
+    await $`osascript -e ${`
+        tell application "Keynote"
+            activate
+            set the_document to open POSIX file "${absolute_input_path}"
             delay 0.5
-            export theDoc to POSIX file \"$ABS_OUT\" as PDF
-            close theDoc saving no
-        on error errMsg
-            log \"Error converting $file: \" & errMsg
-        end try
-    end tell"
-done
-
-echo "Done! Processed ${#FILES_TO_PROCESS[@]} file(s)."
+            export the_document to file (POSIX file "${output_path}") as PDF
+            close the_document saving no
+        end tell
+    `}`;
+}

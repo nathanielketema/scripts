@@ -1,74 +1,104 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bun
 
-# Script to convert Docs to pdf
+import { $ } from "bun";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
-# Function to show usage
-show_usage() {
-    echo "Usage: docsTopdf [directory | file1.docx file2.pages ...]"
-    echo ""
-    echo "Examples:"
-    echo "  docsTopdf .             # Convert all docs in current folder"
-    echo "  docsTopdf report.docx   # Convert specific file"
-    echo "  docsTopdf *.docx        # Convert all docx using wildcard"
+type App_name = "Pages";
+
+const supported_extensions = new Set([".docx", ".doc", ".pages"]);
+
+function show_usage(): void {
+    console.log("Usage: dtp [directory | file1.docx file2.pages ...]");
+    console.log("");
+    console.log("Examples:");
+    console.log("  dtp .             # Convert all docs in current folder");
+    console.log("  dtp report.docx   # Convert specific file");
+    console.log("  dtp *.docx        # Convert all docx using wildcard");
 }
 
-# 1. Check if any arguments were provided
-if [ $# -eq 0 ]; then
-    show_usage
-    exit 1
-fi
+function get_output_path(input_path: string): string {
+    const parsed_path = path.parse(input_path);
+    return path.join(parsed_path.dir, `${parsed_path.name}.pdf`);
+}
 
-FILES_TO_PROCESS=()
+async function collect_directory_files(directory_path: string): Promise<string[]> {
+    const entries = await Array.fromAsync(new Bun.Glob("*").scan({ cwd: directory_path, onlyFiles: true }));
+    return entries
+        .filter((entry) => supported_extensions.has(path.extname(entry).toLowerCase()))
+        .map((entry) => path.join(directory_path, entry));
+}
 
-# 2. Determine file list
-if [ "$1" == "." ] || [ -d "$1" ]; then
-    # Expand directory (defaults to current if .)
-    SEARCH_DIR="${1:-.}"
-    shopt -s nullglob
-    # Capture both Word and Pages formats
-    for f in "$SEARCH_DIR"/*.{docx,doc,pages}; do
-        FILES_TO_PROCESS+=("$f")
-    done
-else
-    # Treat arguments as a list of files
-    for arg in "$@"; do
-        if [[ "$arg" == *.docx || "$arg" == *.doc || "$arg" == *.pages ]]; then
-            FILES_TO_PROCESS+=("$arg")
-        else
-            echo "Skipping $arg (not a supported document format)"
-        fi
-    done
-fi
+async function collect_files(argv: string[]): Promise<string[]> {
+    if (argv.length === 0) {
+        return [];
+    }
 
-# 3. Check if we found anything
-if [ ${#FILES_TO_PROCESS[@]} -eq 0 ]; then
-    echo "Error: No supported document files found."
-    exit 1
-fi
+    const first_arg = argv[0];
+    if (first_arg === "." || existsSync(first_arg) && (await Bun.file(first_arg).stat()).isDirectory()) {
+        const directory_path = path.resolve(first_arg === "." ? "." : first_arg);
+        return collect_directory_files(directory_path);
+    }
 
-# 4. Loop and Convert
-for file in "${FILES_TO_PROCESS[@]}"; do
-    # Get absolute paths (required for AppleScript)
-    ABS_PATH=$(realpath "$file")
-    DIR_PATH=$(dirname "$ABS_PATH")
-    # Remove extension for the base name
-    FILENAME=$(basename "$file")
-    BASE_NAME="${FILENAME%.*}"
-    ABS_OUT="$DIR_PATH/$BASE_NAME.pdf"
+    const files_to_process: string[] = [];
+    for (const arg of argv) {
+        if (supported_extensions.has(path.extname(arg).toLowerCase())) {
+            files_to_process.push(path.resolve(arg));
+        } else {
+            console.log(`Skipping ${arg} (not a supported document format)`);
+        }
+    }
 
-    echo "Converting: $file -> $BASE_NAME.pdf"
+    return files_to_process;
+}
 
-    osascript -e "tell application \"Pages\"
-        activate
-        try
-            set theDoc to open POSIX file \"$ABS_PATH\"
+async function close_app(app_name: App_name): Promise<void> {
+    await $`osascript -e ${`
+        if application "${app_name}" is running then
+            tell application "${app_name}" to quit
+        end if
+    `}`.quiet().nothrow();
+}
+
+async function convert_file(input_path: string): Promise<void> {
+    const absolute_input_path = path.resolve(input_path);
+    const output_path = get_output_path(absolute_input_path);
+
+    console.log(`Converting: ${absolute_input_path} -> ${path.basename(output_path)}`);
+    await $`osascript -e ${`
+        tell application "Pages"
+            activate
+            set the_document to open POSIX file "${absolute_input_path}"
             delay 0.5
-            export theDoc to POSIX file \"$ABS_OUT\" as PDF
-            close theDoc saving no
-        on error errMsg
-            log \"Error converting $file: \" & errMsg
-        end try
-    end tell"
-done
+            export the_document to file (POSIX file "${output_path}") as PDF
+            close the_document saving no
+        end tell
+    `}`;
+}
 
-echo "Done! Processed ${#FILES_TO_PROCESS[@]} file(s)."
+async function main(): Promise<void> {
+    const args = process.argv.slice(2);
+
+    if (args.length === 0) {
+        show_usage();
+        process.exit(1);
+    }
+
+    const files_to_process = await collect_files(args);
+    if (files_to_process.length === 0) {
+        console.error("Error: No supported document files found.");
+        process.exit(1);
+    }
+
+    try {
+        for (const file_path of files_to_process) {
+            await convert_file(file_path);
+        }
+
+        console.log(`Done! Processed ${files_to_process.length} file(s).`);
+    } finally {
+        await close_app("Pages");
+    }
+}
+
+await main();
