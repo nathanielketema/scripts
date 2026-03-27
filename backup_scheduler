@@ -1,0 +1,123 @@
+#!/usr/bin/env bun
+
+import { $ } from "bun";
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+
+type Action = "load" | "list" | "remove";
+
+type SchedulerConfig = {
+    action: Action;
+    backup_script_path: string;
+    schedule: string;
+    title: string;
+    stdout_log_path: string;
+    stderr_log_path: string;
+};
+
+const schedule = "0 3 * * *";
+const title = "user_backup";
+const backup_script_path = Bun.fileURLToPath(new URL("./backup", import.meta.url));
+const plist_path = `${process.env.HOME}/Library/LaunchAgents/bun.cron.${title}.plist`;
+const label = `bun.cron.${title}`;
+const stdout_log_path = `${process.env.HOME}/.backup/backup.log`;
+const stderr_log_path = `${process.env.HOME}/.backup/backup-error.log`;
+
+function parse_action(argv: string[]): Action {
+    const action = argv[2] ?? "list";
+    assert(action === "load" || action === "list" || action === "remove", `Unsupported action: ${action}`);
+    return action;
+}
+
+function get_config(argv: string[]): SchedulerConfig {
+    assert(existsSync(backup_script_path), `Backup script not found: ${backup_script_path}`);
+
+    return {
+        action: parse_action(argv),
+        backup_script_path,
+        schedule,
+        title,
+        stdout_log_path,
+        stderr_log_path,
+    };
+}
+
+async function write_log_paths(plist_path: string, config: SchedulerConfig): Promise<void> {
+    await $`plutil -replace StandardOutPath -string ${config.stdout_log_path} ${plist_path}`.quiet();
+    await $`plutil -replace StandardErrorPath -string ${config.stderr_log_path} ${plist_path}`.quiet();
+}
+
+async function bootout_job(): Promise<void> {
+    await $`launchctl bootout gui/${process.getuid()}/${label}`.quiet().nothrow();
+}
+
+async function bootstrap_job(): Promise<void> {
+    await $`launchctl bootstrap gui/${process.getuid()} ${plist_path}`.quiet();
+}
+
+async function load_scheduler(config: SchedulerConfig): Promise<void> {
+    await bootout_job();
+
+    if (existsSync(plist_path)) {
+        await $`rm ${plist_path}`;
+    }
+
+    Bun.cron(config.backup_script_path, config.schedule, config.title);
+    await write_log_paths(plist_path, config);
+    await bootout_job();
+    await bootstrap_job();
+
+    console.log(`Loaded: ${label}`);
+    console.log(`Schedule: ${config.schedule}`);
+    console.log(`Plist: ${plist_path}`);
+    console.log(`Stdout: ${config.stdout_log_path}`);
+    console.log(`Stderr: ${config.stderr_log_path}`);
+}
+
+async function get_loaded_status(): Promise<string> {
+    const result = await $`launchctl print gui/${process.getuid()}/${label}`.quiet().nothrow();
+    return result.exitCode === 0 ? "loaded" : "not loaded";
+}
+
+async function list_scheduler(): Promise<void> {
+    if (!existsSync(plist_path)) {
+        console.log(`Missing: ${plist_path}`);
+        return;
+    }
+
+    console.log(`Label: ${await $`plutil -extract Label raw -o - ${plist_path}`.text()}`.trimEnd());
+    console.log(`Plist: ${plist_path}`);
+    console.log(`Stdout: ${await $`plutil -extract StandardOutPath raw -o - ${plist_path}`.text()}`.trimEnd());
+    console.log(`Stderr: ${await $`plutil -extract StandardErrorPath raw -o - ${plist_path}`.text()}`.trimEnd());
+    console.log(`Loaded: ${await get_loaded_status()}`);
+}
+
+async function remove_scheduler(): Promise<void> {
+    await bootout_job();
+
+    if (!existsSync(plist_path)) {
+        console.log(`Missing: ${plist_path}`);
+        return;
+    }
+
+    await $`rm ${plist_path}`;
+    console.log(`Removed: ${plist_path}`);
+}
+
+async function main(): Promise<void> {
+    const config = get_config(process.argv);
+
+    switch (config.action) {
+        case "load":
+            await load_scheduler(config);
+            return;
+        case "list":
+            await list_scheduler();
+            return;
+        case "remove":
+            await remove_scheduler();
+            return;
+    }
+}
+
+await main();
