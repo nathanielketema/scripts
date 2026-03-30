@@ -2,22 +2,22 @@
 
 import { $ } from "bun";
 
-const source = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDocs/`;
-const backup = `${process.env.HOME}/.backup/`;
+const source_path = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDocs/`;
+const backup_path = `${process.env.HOME}/.backup/`;
 
 const folders = ["personal", "school", "work", "misc"];
 
-console.log("Starting Sync...");
+async function run_backup(): Promise<void> {
+    console.log("Starting Sync...");
 
-try {
-    const exists = await $`ls ${backup}`.quiet().nothrow();
+    const exists = await $`ls ${backup_path}`.quiet().nothrow();
     if (exists.exitCode !== 0) {
         throw new Error("Backup directory not found!");
     }
 
     for (const folder of folders) {
-        const src = `${source}${folder}/`;
-        const dest = `${backup}${folder}/`;
+        const src = `${source_path}${folder}/`;
+        const dest = `${backup_path}${folder}/`;
 
         console.log(`Syncing ${folder}...`);
         await $`rsync -av --delete \
@@ -33,7 +33,7 @@ try {
     }
 
     console.log("Committing to git...");
-    process.chdir(backup);
+    process.chdir(backup_path);
 
     await $`git config advice.addEmbeddedRepo false`.nothrow().quiet();
     await $`git config core.safecrlf false`.nothrow().quiet();
@@ -48,7 +48,20 @@ try {
     } else {
         console.log("Success..no changes detected. Git is already up to date.");
     }
-} catch (err) {
-    console.error(`Fail..Backup failed: ${err.message}`);
-    process.exit(1);
+}
+
+export async function scheduled(): Promise<void> {
+    await run_backup();
+}
+
+export default { scheduled };
+
+if (import.meta.main) {
+    try {
+        await run_backup();
+    } catch (err) {
+        const error = err as Error;
+        console.error(`Fail..Backup failed: ${error.message}`);
+        process.exit(1);
+    }
 }
