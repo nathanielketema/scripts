@@ -6,20 +6,36 @@ const source_path = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDo
 const backup_path = `${process.env.HOME}/.backup/`;
 
 const folders = ["personal", "school", "work", "misc"];
+const deadlock_pattern = /^rsync\(\d+\): error: (.*): mmap: Resource deadlock avoided$/gm;
 
-async function run_backup(): Promise<void> {
-    console.log("Starting Sync...");
+type Shell_error = Error & {
+    stderr?: string;
+};
 
-    const exists = await $`ls ${backup_path}`.quiet().nothrow();
-    if (exists.exitCode !== 0) {
-        throw new Error("Backup directory not found!");
+function get_deadlock_paths(stderr: string): string[] {
+    const file_paths = new Set<string>();
+
+    for (const match of stderr.matchAll(deadlock_pattern)) {
+        file_paths.add(match[1]);
     }
 
-    for (const folder of folders) {
-        const src = `${source_path}${folder}/`;
-        const dest = `${backup_path}${folder}/`;
+    return Array.from(file_paths);
+}
 
-        console.log(`Syncing ${folder}...`);
+async function hydrate_files(file_paths: string[]): Promise<void> {
+    for (const file_path of file_paths) {
+        console.log(`Hydrating iCloud file: ${file_path}`);
+        await $`/usr/bin/brctl download ${file_path}`;
+    }
+}
+
+async function sync_folder(folder: string): Promise<void> {
+    const src = `${source_path}${folder}/`;
+    const dest = `${backup_path}${folder}/`;
+
+    console.log(`Syncing ${folder}...`);
+
+    try {
         await $`rsync -av --delete \
       --exclude='.git' \
       --exclude='node_modules' \
@@ -30,6 +46,39 @@ async function run_backup(): Promise<void> {
       --exclude='*.pyc' \
       --exclude='.DS_Store' \
       ${src} ${dest}`;
+    } catch (err) {
+        const error = err as Shell_error;
+        const stderr = error.stderr ?? "";
+        const deadlock_paths = get_deadlock_paths(stderr);
+
+        if (deadlock_paths.length === 0) {
+            throw error;
+        }
+
+        await hydrate_files(deadlock_paths);
+        await $`rsync -av --delete \
+      --exclude='.git' \
+      --exclude='node_modules' \
+      --exclude='.zig-cache' \
+      --exclude='zig-pkg' \
+      --exclude='__pycache__' \
+      --exclude='.pytest_cache' \
+      --exclude='*.pyc' \
+      --exclude='.DS_Store' \
+      ${src} ${dest}`;
+    }
+}
+
+async function run_backup(): Promise<void> {
+    console.log("Starting Sync...");
+
+    const exists = await $`ls ${backup_path}`.quiet().nothrow();
+    if (exists.exitCode !== 0) {
+        throw new Error("Backup directory not found!");
+    }
+
+    for (const folder of folders) {
+        await sync_folder(folder);
     }
 
     console.log("Committing to git...");
