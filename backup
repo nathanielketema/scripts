@@ -6,7 +6,7 @@ const source_path = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDo
 const backup_path = `${process.env.HOME}/.backup/`;
 
 const folders = ["personal", "school", "work", "misc"];
-const deadlock_pattern = /^rsync\(\d+\): error: (.*): mmap: Resource deadlock avoided$/gm;
+const deadlock_pattern = /^rsync\(\d+\): error: (.*): mmap: Resource deadlock avoided\s*$/gm;
 
 type Shell_error = Error & {
     stderr?: string;
