@@ -48,7 +48,7 @@ async function sync_folder(folder: string): Promise<void> {
       ${src} ${dest}`;
     } catch (err) {
         const error = err as Shell_error;
-        const stderr = error.stderr ?? "";
+        const stderr = error.stderr?.toString() ?? "";
         const deadlock_paths = get_deadlock_paths(stderr);
 
         if (deadlock_paths.length === 0) {
