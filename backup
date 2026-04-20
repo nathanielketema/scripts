@@ -6,7 +6,21 @@ const source_path = `/Users/nathaniel/Library/Mobile Documents/com~apple~CloudDo
 const backup_path = `${process.env.HOME}/.backup/`;
 
 const folders = ["personal", "school", "work", "misc"];
-const deadlock_pattern = /^rsync\(\d+\): error: (.*): mmap: Resource deadlock avoided\s*$/gm;
+const deadlock_pattern = /^rsync\(\d+\): error: (.*): mmap: (?:Resource deadlock avoided|Operation timed out)\s*$/gm;
+const max_deadlock_retries = 3;
+const rsync_excludes = [
+    ".git",
+    "**/.git",
+    "**/.git/**",
+    "**/worktrees",
+    "node_modules",
+    ".zig-cache",
+    "zig-pkg",
+    "__pycache__",
+    ".pytest_cache",
+    "*.pyc",
+    ".DS_Store",
+];
 
 type Shell_error = Error & {
     stderr?: string;
@@ -29,43 +43,47 @@ async function hydrate_files(file_paths: string[]): Promise<void> {
     }
 }
 
+function get_rsync_args(src: string, dest: string): string[] {
+    return [
+        "-av",
+        "--delete",
+        ...rsync_excludes.flatMap((pattern) => ["--exclude", pattern]),
+        src,
+        dest,
+    ];
+}
+
+async function run_rsync(src: string, dest: string): Promise<void> {
+    await $`rsync ${get_rsync_args(src, dest)}`;
+}
+
 async function sync_folder(folder: string): Promise<void> {
     const src = `${source_path}${folder}/`;
     const dest = `${backup_path}${folder}/`;
 
     console.log(`Syncing ${folder}...`);
 
-    try {
-        await $`rsync -av --delete \
-      --exclude='.git' \
-      --exclude='node_modules' \
-      --exclude='.zig-cache' \
-      --exclude='zig-pkg' \
-      --exclude='__pycache__' \
-      --exclude='.pytest_cache' \
-      --exclude='*.pyc' \
-      --exclude='.DS_Store' \
-      ${src} ${dest}`;
-    } catch (err) {
-        const error = err as Shell_error;
-        const stderr = error.stderr?.toString() ?? "";
-        const deadlock_paths = get_deadlock_paths(stderr);
+    const hydrated_paths = new Set<string>();
 
-        if (deadlock_paths.length === 0) {
-            throw error;
+    for (let attempt = 0; attempt <= max_deadlock_retries; attempt += 1) {
+        try {
+            await run_rsync(src, dest);
+            return;
+        } catch (err) {
+            const error = err as Shell_error;
+            const stderr = error.stderr?.toString() ?? "";
+            const deadlock_paths = get_deadlock_paths(stderr).filter((file_path) => !hydrated_paths.has(file_path));
+
+            if (deadlock_paths.length === 0 || attempt === max_deadlock_retries) {
+                throw error;
+            }
+
+            for (const file_path of deadlock_paths) {
+                hydrated_paths.add(file_path);
+            }
+
+            await hydrate_files(deadlock_paths);
         }
-
-        await hydrate_files(deadlock_paths);
-        await $`rsync -av --delete \
-      --exclude='.git' \
-      --exclude='node_modules' \
-      --exclude='.zig-cache' \
-      --exclude='zig-pkg' \
-      --exclude='__pycache__' \
-      --exclude='.pytest_cache' \
-      --exclude='*.pyc' \
-      --exclude='.DS_Store' \
-      ${src} ${dest}`;
     }
 }
 
