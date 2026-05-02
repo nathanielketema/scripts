@@ -1,0 +1,10 @@
+#!/usr/bin/env bun
+
+import { $ } from "bun";
+import path from "node:path"
+
+const file_name = Bun.argv[2];
+const full = path.basename(file_name);
+
+await $`tmux new-window "sioyek ${full} --new-window"`;
+await $`tmux previous-window`;
