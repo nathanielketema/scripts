@@ -39,8 +39,8 @@ async function setup(): Promise<void> {
 
 async function brew(): Promise<void> {
     await $`brew update`;
-    await $`brew upgrade`;
     await $`brew bundle install --global`;
+    await $`brew upgrade`;
     await $`brew bundle cleanup --global --force --zap`;
     await $`brew cleanup --prune=all`;
 }
