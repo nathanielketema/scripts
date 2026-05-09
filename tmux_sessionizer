@@ -10,7 +10,6 @@ else
         "$HOME/work/" \
         "$HOME/misc/" \
         "$HOME/personal/notes/" \
-        "$HOME/school/dsu/3-spring-2026/" \
         -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf)
 fi
 
