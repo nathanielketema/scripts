@@ -5,6 +5,7 @@ if [[ $# -eq 1 ]]; then
 else
     selected=$(find \
         "$HOME/" \
+        "$HOME/git-clone/" \
         "$HOME/personal/" \
         "$HOME/school/" \
         "$HOME/work/" \
