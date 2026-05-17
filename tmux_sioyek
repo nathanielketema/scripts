@@ -1,0 +1,6 @@
+#!/usr/bin/env fish
+
+set --local file_name $argv[1]
+
+tmux new-window "sioyek '$file_name' --new-window"
+tmux last-window

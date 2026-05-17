@@ -1,6 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env fish
 
-import { $ } from "bun";
-
-await $`git add .`;
-await $`git commit -m .`;
+git add .
+git commit -m .
