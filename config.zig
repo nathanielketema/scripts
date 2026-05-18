@@ -5,6 +5,8 @@ const assert = std.debug.assert;
 const stdx = @import("include/stdx.zig");
 const Shell = stdx.Shell;
 
+const Io = std.Io;
+
 const Error = error{ InvalidArguments, InvalidCommand };
 
 pub fn main(init: std.process.Init) !void {
@@ -18,26 +20,46 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
     switch (input.command) {
-        .setup => @panic("TODO"),
+        .init => @panic("TODO"),
         .brew => try brew(shell),
-        .stow => @panic("TODO"),
+        .stow => try stow(shell, init.environ_map),
         .help => std.debug.print("{s}\n", .{help}),
     }
 }
 
 pub fn brew(shell: Shell) !void {
-    try shell.run("brew update", .{});
-    try shell.run("brew bundle install --global", .{});
-    try shell.run("brew upgrade", .{});
-    try shell.run("brew bundle cleanup --global --force --zap", .{});
-    try shell.run("brew cleanup --prune=all", .{});
+    try shell.spawn("brew update", .{});
+    try shell.spawn("brew bundle install --global", .{});
+    try shell.spawn("brew upgrade", .{});
+    try shell.spawn("brew bundle cleanup --global --force --zap", .{});
+    try shell.spawn("brew cleanup --prune=all", .{});
+}
+
+pub fn stow(shell: Shell, env: *std.process.Environ.Map) !void {
+    const result = try std.process.run(
+        shell.arena,
+        shell.io,
+        .{ .argv = &.{ "stow", "--version" } },
+    );
+    if(result.term.exited != 0) return error.StowNotInstalled;
+
+    const dot_files_path = env.get("DOTFILES") orelse return error.Env_DOTFILES_NotFound;
+    const dir = try Io.Dir.openDir(.cwd(), shell.io, dot_files_path, .{ .iterate = true });
+    try Io.Threaded.chdir(dot_files_path);
+
+    var dot_files = dir.iterate();
+    while (try dot_files.next(shell.io)) |entry| {
+        assert(entry.name.len > 0);
+        if (std.mem.eql(u8, entry.name, ".git")) continue;
+        try shell.spawn("stow {s}", .{entry.name});
+    }
 }
 
 const Input = struct {
     command: Command,
 
     const Command = enum {
-        setup,
+        init,
         brew,
         stow,
         help,
@@ -61,8 +83,8 @@ const help =
     \\Usage: config <command>
     \\
     \\Available commands:
-    \\    setup - setup full system
-    \\    brew  - keeps all packages and casks up to date with the Brewfile
-    \\    stow  - runs stow for each top level directory inside ~/.dotfiles
-    \\    help  - show help docs
+    \\    init - init full system
+    \\    brew - keep all packages and casks up to date using Brewfile
+    \\    stow - symlink $DOTFILES
+    \\    help - show help docs
 ;

@@ -21,7 +21,7 @@ pub const Shell = struct {
         };
     }
 
-    pub fn run(shell: Shell, comptime fmt: []const u8, args: anytype) !void {
+    pub fn spawn(shell: Shell, comptime fmt: []const u8, args: anytype) !void {
         const command = try std.fmt.allocPrint(shell.arena, fmt, args);
 
         var it = std.mem.tokenizeScalar(u8, command, ' ');
@@ -32,6 +32,30 @@ pub const Shell = struct {
 
         var child = try std.process.spawn(shell.io, .{ .argv = argv.items });
         _ = try child.wait(shell.io);
+    }
+
+    pub fn spawn_raw(shell: Shell, argv: []const []const u8) !void {
+        var child = try std.process.spawn(shell.io, .{ .argv = argv });
+        _ = try child.wait(shell.io);
+    }
+
+    pub fn run(
+        shell: Shell,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) !std.process.RunResult {
+        const command = try std.fmt.allocPrint(shell.arena, fmt, args);
+
+        var it = std.mem.tokenizeScalar(u8, command, ' ');
+        var argv: std.ArrayList([]const u8) = .empty;
+        while (it.next()) |item| {
+            try argv.append(shell.arena, item);
+        }
+        return try std.process.run(shell.arena, shell.io, .{ .argv = argv.items });
+    }
+
+    pub fn run_raw(shell: Shell, argv: []const []const u8) !std.process.RunResult {
+        return try std.process.run(shell.arena, shell.io, .{ .argv = argv });
     }
 };
 
