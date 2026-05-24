@@ -9,6 +9,16 @@ const Io = std.Io;
 
 const Error = error{ InvalidArguments, InvalidCommand };
 
+const usage =
+    \\Usage: config <command>
+    \\
+    \\Available commands:
+    \\    init - init full system
+    \\    brew - keep all packages and casks up to date using Brewfile
+    \\    stow - symlink $DOTFILES
+    \\    help - show help docs
+;
+
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const arena = init.arena.allocator();
@@ -16,14 +26,14 @@ pub fn main(init: std.process.Init) !void {
     const shell: Shell = .init(io, arena);
 
     const input: Input = Input.parse(argv) catch {
-        std.debug.print("{s}\n", .{help});
+        std.debug.print("{s}\n", .{usage});
         return;
     };
     switch (input.command) {
         .init => @panic("TODO"),
         .brew => try brew(shell),
         .stow => try stow(shell, init.environ_map),
-        .help => std.debug.print("{s}\n", .{help}),
+        .help => std.debug.print("{s}\n", .{usage}),
     }
 }
 
@@ -79,12 +89,3 @@ const Input = struct {
     }
 };
 
-const help =
-    \\Usage: config <command>
-    \\
-    \\Available commands:
-    \\    init - init full system
-    \\    brew - keep all packages and casks up to date using Brewfile
-    \\    stow - symlink $DOTFILES
-    \\    help - show help docs
-;
