@@ -7,16 +7,26 @@ const Shell = stdx.Shell;
 
 const Allocator = std.mem.Allocator;
 
+const usage = "Usage: mtp.zig file_name";
+
 pub fn main(init: std.process.Init) !void {
     const argv = try init.minimal.args.toSlice(init.arena.allocator());
-    const pandoc: Pandoc = try .init(init.arena.allocator(), argv);
+    const pandoc = Pandoc.init(init.arena.allocator(), argv) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        std.debug.print("{s}\n", .{usage});
+        return;
+    };
 
     const shell: Shell = .init(init.io, init.arena.allocator());
-    try shell.run("pandoc '{s}' '{s}' --pdf-engine='{s}'", .{
+    const result = try shell.run("pandoc {s} --output {s} --pdf-engine={s}", .{
         pandoc.input,
         pandoc.output,
         @tagName(pandoc.engine),
     });
+
+    if (result.term.exited != 0) {
+        std.debug.print("{s}\n", .{result.stderr});
+    }
 }
 
 pub const Pandoc = struct {
@@ -43,7 +53,7 @@ pub const Pandoc = struct {
 
 test Pandoc {
     const testing = std.testing;
-    var arena: std.heap.ArenaAllocator = .init(testing.allocator);
+    var arena: std.heap.ArenaAllocatorj = .init(testing.allocator);
     defer arena.deinit();
 
     const text = &.{ "mtp.zig", "foo_bar.md" };
