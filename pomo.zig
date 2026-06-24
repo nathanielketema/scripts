@@ -36,7 +36,7 @@ pub fn main(init: std.process.Init) !void {
     if (argc == 3) {
         total = try std.fmt.parseInt(i64, argv[2], 10);
     }
-    std.log.info("Timer started for {} minutes...", .{total});
+    std.debug.print("Timer started for {} minutes...\n", .{total});
 
     const interval: i64 = switch (option) {
         .start => 5,
@@ -51,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
             .{ elapsed, total, total - elapsed },
         );
     }
-    std.log.info("Pomodoro finished!", .{});
+    std.debug.print("Pomodoro finished!\n", .{});
     _ = try shell.run("say 'Congrats!! Pomodoro finished!'", .{});
 }
 
