@@ -8,20 +8,50 @@ else
         "$HOME/git-clone/" \
         "$HOME/personal/" \
         "$HOME/school/" \
-        "$HOME/school/dsu/3-summer-2026/" \
         "$HOME/work/" \
         "$HOME/misc/" \
         "$HOME/personal/notes/" \
-        -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf)
+        -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf --print-query)
 fi
 
 if [[ -z "$selected" ]]; then
     exit 0
 fi
 
+DEV_DIR=$(echo -e "personal\nschool\nmisc\nwork" | fzf --prompt="Select destination:")
+DEV_DIR="$HOME/$DEV_DIR/"
+
+if [[ ! -d $selected ]]; then
+    # Check if the input is a GitHub URL
+    if [[ $selected == https://github.com/* || $selected == git@github.com:* || $selected == https://codeberg.org/* ]]; then
+        # It's a GitHub URL, extract the repo name from the URL
+        repo_name=$(basename "$selected" .git)
+        echo "Cloning GitHub repo '$repo_name' to '${DEV_DIR}/$repo_name'."
+        read -p "Enter new directory name or press enter to use '$repo_name': " custom_name
+
+        if [[ -n $custom_name ]]; then
+            target_dir="${DEV_DIR}/$custom_name"
+        else
+            target_dir="${DEV_DIR}/$repo_name"
+        fi
+
+        git clone "$selected" "$target_dir"
+        if [[ $? -eq 0 ]]; then
+            echo "Repository cloned successfully to $target_dir"
+            selected="$target_dir"
+        else
+            echo "Failed to clone repository"
+            exit 1
+        fi
+    else
+        mkdir -p "${DEV_DIR}/$selected"
+        selected="${DEV_DIR}/$selected"
+    fi
+fi
+
 selected_name=$(basename "$selected" | tr '. ' '_')
 
-if [[ -z "$TMUX" ]] && ! grep -x tmux > /dev/null; then
+if [[ -z "$TMUX" ]] && ! grep -x tmux >/dev/null; then
     tmux new-session -s "$selected_name" -c "$selected"
     exit 0
 fi
