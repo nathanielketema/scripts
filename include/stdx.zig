@@ -57,6 +57,65 @@ pub const Shell = struct {
     pub fn run_raw(shell: Shell, argv: []const []const u8) !std.process.RunResult {
         return try std.process.run(shell.arena, shell.io, .{ .argv = argv });
     }
+
+    pub const Pipeline = struct {
+        shell: Shell,
+        source_argv: []const []const u8,
+        output_text: []const u8,
+
+        pub fn pipe(p: Pipeline, argv: []const []const u8) Pipeline {
+            var producer = std.process.spawn(p.shell.io, .{
+                .argv = p.source_argv,
+                .stdout = .pipe,
+            }) catch std.process.exit(1);
+
+            var consumer = std.process.spawn(p.shell.io, .{
+                .argv = argv,
+                .stdin = .pipe,
+                .stdout = .pipe,
+            }) catch std.process.exit(1);
+
+            var producer_stdout_buffer: [4096]u8 = undefined;
+            var consumer_stdout_buffer: [4096]u8 = undefined;
+            var consumer_stdin_buffer: [4096]u8 = undefined;
+
+            var producer_reader = producer.stdout.?.reader(p.shell.io, &producer_stdout_buffer);
+            var consumer_reader = consumer.stdout.?.reader(p.shell.io, &consumer_stdout_buffer);
+            var consumer_writer = consumer.stdin.?.writer(p.shell.io, &consumer_stdin_buffer);
+
+            _ = producer_reader.interface.streamRemaining(
+                &consumer_writer.interface,
+            ) catch std.process.exit(1);
+            consumer_writer.interface.flush() catch std.process.exit(1);
+            consumer.stdin.?.close(p.shell.io);
+            consumer.stdin = null;
+
+            const output_text = consumer_reader.interface.allocRemaining(
+                p.shell.arena,
+                .unlimited,
+            ) catch std.process.exit(1);
+            _ = producer.wait(p.shell.io) catch std.process.exit(1);
+            _ = consumer.wait(p.shell.io) catch std.process.exit(1);
+
+            return .{
+                .shell = p.shell,
+                .source_argv = p.source_argv,
+                .output_text = output_text,
+            };
+        }
+
+        pub fn text(p: Pipeline) []const u8 {
+            return p.output_text;
+        }
+    };
+
+    pub fn pipeline(shell: Shell, argv: []const []const u8) Pipeline {
+        return .{
+            .shell = shell,
+            .source_argv = argv,
+            .output_text = "",
+        };
+    }
 };
 
 pub const Snapshot = struct {
@@ -150,6 +209,7 @@ pub const Snapshot = struct {
         try want.diff(got);
     }
 };
+
 const Range = struct {
     start: usize,
     end: usize,
