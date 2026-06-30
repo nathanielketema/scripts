@@ -102,7 +102,6 @@ pub const Context = struct {
             ctx.home("misc/"),
             ctx.home("personal/notes/"),
             ctx.home("git-clone/"),
-            ctx.home("local/"),
             "-mindepth",
             "1",
             "-maxdepth",
@@ -118,7 +117,6 @@ pub const Context = struct {
             "school",
             "misc",
             "work",
-            "local",
             "git-clone",
         }) catch std.process.exit(1);
         return ctx.shell.pipeline(&.{
