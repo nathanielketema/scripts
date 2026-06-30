@@ -16,16 +16,16 @@ pub fn main(init: std.process.Init) !void {
     const cmdline_arg = cmd_it.next();
 
     const selected_path = blk: {
-        if (cmdline_arg) |cmdline_selection| {
-            break :blk std.mem.trim(u8, cmdline_selection, "\n\r");
+        if (cmdline_arg) |cmdline| {
+            break :blk std.mem.trim(u8, cmdline, "\n\r");
         }
-        const raw_selection = ctx.select_directory();
+        const selected_path_raw = ctx.select_directory();
 
-        var it = std.mem.tokenizeScalar(u8, raw_selection, '\n');
+        var it = std.mem.tokenizeScalar(u8, selected_path_raw, '\n');
         const query = it.next() orelse return;
 
-        if (it.next()) |selection| {
-            break :blk std.mem.trim(u8, selection, "\n\r");
+        if (it.next()) |selected| {
+            break :blk std.mem.trim(u8, selected, "\n\r");
         } else {
             break :blk try ctx.create_new_directory_and_return_selected(query);
         }
@@ -113,7 +113,7 @@ pub const Context = struct {
     }
 
     pub fn select_destination(ctx: Context) []const u8 {
-        const search_dirs = std.mem.join(ctx.arena, "\n", &.{
+        const dirs_search = std.mem.join(ctx.arena, "\n", &.{
             "personal",
             "school",
             "misc",
@@ -123,36 +123,36 @@ pub const Context = struct {
         }) catch std.process.exit(1);
         return ctx.shell.pipeline(&.{
             "echo",
-            search_dirs,
+            dirs_search,
         }).pipe(&.{ "fzf", "--prompt=Select destination: " }).text();
     }
 
     pub fn create_new_directory_and_return_selected(ctx: Context, query: []const u8) ![]const u8 {
-        const destination_path = std.mem.trim(u8, ctx.select_destination(), "\n\r");
+        const path_destination = std.mem.trim(u8, ctx.select_destination(), "\n\r");
         const query_trimmed = std.mem.trim(u8, query, "\n\r");
 
         if (std.mem.startsWith(u8, query_trimmed, "https://github.com/") or
             std.mem.startsWith(u8, query_trimmed, "git@github.com:") or
-            std.mem.startsWith(u8, query_trimmed, "https://codeberg.org/"))
+            std.mem.startsWith(u8, query_trimmed, "https://codeberg.org/") or
+            std.mem.startsWith(u8, query_trimmed, "ssh://git@codeberg.org/"))
         {
-            const repo_basename = Io.Dir.path.basename(query_trimmed);
-            const repo_name = repo_basename[0 .. repo_basename.len - ".git".len];
+            const repo_name = Io.Dir.path.stem(query_trimmed);
 
-            const target_path = try Io.Dir.path.join(ctx.arena, &.{
-                ctx.home(destination_path),
+            const path_target = try Io.Dir.path.join(ctx.arena, &.{
+                ctx.home(path_destination),
                 repo_name,
             });
 
-            _ = try ctx.shell.run("git clone {s} {s}", .{ query_trimmed, target_path });
-            return target_path;
+            _ = try ctx.shell.run("git clone {s} {s}", .{ query_trimmed, path_target });
+            return path_target;
         }
 
-        const new_path = try Io.Dir.path.join(ctx.arena, &.{
-            ctx.home(destination_path),
+        const path_new = try Io.Dir.path.join(ctx.arena, &.{
+            ctx.home(path_destination),
             query_trimmed,
         });
 
-        try Io.Dir.createDirPath(.cwd(), ctx.io, new_path);
-        return new_path;
+        try Io.Dir.createDirPath(.cwd(), ctx.io, path_new);
+        return path_new;
     }
 };

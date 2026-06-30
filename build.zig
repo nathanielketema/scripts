@@ -5,17 +5,18 @@ pub fn build(b: *std.Build) !void {
     const cwd = try Io.Dir.openDir(.cwd(), b.graph.io, ".", .{ .iterate = true });
     var it = cwd.iterate();
     while (try it.next(b.graph.io)) |entry| {
-        const script = entry.name;
+        const file_basename = entry.name;
+        const file_extension = Io.Dir.path.extension(file_basename);
         if (entry.kind == .file and
-            std.mem.endsWith(u8, script, ".zig") and
-            !std.mem.eql(u8, script, "build.zig"))
+            std.mem.eql(u8, file_extension, ".zig") and
+            !std.mem.eql(u8, file_basename, "build.zig"))
         {
-            const name = script[0 .. script.len - ".zig".len];
+            const file_stem = Io.Dir.path.stem(file_basename);
 
             const exe = b.addExecutable(.{
-                .name = name,
+                .name = file_stem,
                 .root_module = b.createModule(.{
-                    .root_source_file = b.path(script),
+                    .root_source_file = b.path(file_basename),
                     .target = b.graph.host,
                     .optimize = .ReleaseSmall,
                 }),
