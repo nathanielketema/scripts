@@ -42,7 +42,7 @@ pub fn brew(shell: Shell) !void {
     try shell.spawn("brew bundle install --global", .{});
     try shell.spawn("brew upgrade", .{});
     try shell.spawn("brew bundle --global --force --zap cleanup", .{});
-    try shell.spawn("brew cu", .{});
+    try shell.spawn("brew cu --all", .{});
     try shell.spawn("brew cleanup --prune=all", .{});
 }
 
