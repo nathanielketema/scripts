@@ -39,10 +39,9 @@ pub fn main(init: std.process.Init) !void {
 
 pub fn brew(shell: Shell) !void {
     try shell.spawn("brew update", .{});
+    try shell.spawn("brew upgrade --greedy", .{});
     try shell.spawn("brew bundle install --global", .{});
-    try shell.spawn("brew upgrade", .{});
-    try shell.spawn("brew bundle --global --force --zap cleanup", .{});
-    try shell.spawn("brew cu --all", .{});
+    try shell.spawn("brew bundle cleanup --global --zap --force", .{});
     try shell.spawn("brew cleanup --prune=all", .{});
 }
 
