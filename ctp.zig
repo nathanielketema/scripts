@@ -10,6 +10,8 @@ const Allocator = std.mem.Allocator;
 const Shell = @import("include/stdx.zig").Shell;
 
 const usage =
+    \\ctp (Change To PDF)
+    \\
     \\Usage: ctp.zig file_name ...
     \\
     \\Supported file extensions:
@@ -17,6 +19,7 @@ const usage =
     \\    - ".docx"
     \\    - ".pptx"
     \\    - ".pages"
+    \\    - ".md"
     \\
     \\Convert to pdf with ease :)
 ;
@@ -93,6 +96,15 @@ pub fn main(init: std.process.Init) !void {
                     script,
                 });
             },
+            .md => {
+                std.debug.print("input: {s}\n", .{absolute_input_path});
+                std.debug.print("output: {s}\n", .{absolute_output_path});
+                _ = try shell.run("pandoc {s} --output {s} --pdf-engine={s}", .{
+                    absolute_input_path,
+                    absolute_output_path,
+                    @tagName(Engine.xelatex),
+                });
+            },
         }
 
         log.info("{s} converted successfully :)", .{arg});
@@ -104,8 +116,11 @@ const FileExtension = enum {
     doc,
     pages,
     pptx,
+    md,
 
     fn from_str(str: []const u8) ?FileExtension {
         return std.meta.stringToEnum(FileExtension, str);
     }
 };
+
+pub const Engine = enum { pdflatex, xelatex };
