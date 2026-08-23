@@ -20,7 +20,7 @@ pub fn main(init: std.process.Init) !void {
     const argv = try init.minimal.args.toSlice(init.arena.allocator());
     const argc = argv.len;
     if (argc < 2 or argc > 3) {
-        std.log.err("{}\n{s}", .{ error.InvalidArg, usage });
+        std.log.err("{t}\n{s}", .{ error.InvalidArg, usage });
         return;
     }
     const option = Option.from_str(argv[1]) orelse {
