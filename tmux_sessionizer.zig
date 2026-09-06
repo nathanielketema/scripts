@@ -98,6 +98,7 @@ pub const Context = struct {
             ctx.home("/"),
             ctx.home("personal/"),
             ctx.home("school/"),
+            ctx.home("school/dsu/4-fall-2026/"),
             ctx.home("work/"),
             ctx.home("misc/"),
             ctx.home("personal/notes/"),
@@ -112,13 +113,14 @@ pub const Context = struct {
     }
 
     pub fn select_destination(ctx: Context) []const u8 {
-        const dirs_search = std.mem.join(ctx.arena, "\n", &.{
-            "personal",
-            "school",
-            "misc",
-            "work",
-            "git-clone",
-        }) catch std.process.exit(1);
+        const dirs_search =
+            \\personal
+            \\school
+            \\misc
+            \\work
+            \\git-clone
+            \\
+        ;
         return ctx.shell.pipeline(&.{
             "echo",
             dirs_search,
