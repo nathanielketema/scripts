@@ -73,11 +73,12 @@ pub fn main(init: std.process.Init) !void {
                     \\end tell
                 , .{ absolute_input_path, absolute_output_path });
 
-                _ = try shell.run_raw(&.{
+                const result = try shell.run_raw(&.{
                     "osascript",
                     "-e",
                     script,
                 });
+                if (result.term.exited != 0) fatal(arg, "{s}", .{result.stderr});
             },
             .pptx => {
                 const script = try std.fmt.allocPrint(arena,
@@ -90,25 +91,31 @@ pub fn main(init: std.process.Init) !void {
                     \\end tell
                 , .{ absolute_input_path, absolute_output_path });
 
-                _ = try shell.run_raw(&.{
+                const result = try shell.run_raw(&.{
                     "osascript",
                     "-e",
                     script,
                 });
+                if (result.term.exited != 0) fatal(arg, "{s}", .{result.stderr});
             },
             .md => {
-                std.debug.print("input: {s}\n", .{absolute_input_path});
-                std.debug.print("output: {s}\n", .{absolute_output_path});
-                _ = try shell.run("pandoc {s} --output {s} --pdf-engine={s}", .{
+                const result = try shell.run("pandoc {s} --output {s} --pdf-engine={s}", .{
                     absolute_input_path,
                     absolute_output_path,
                     @tagName(Engine.xelatex),
                 });
+                if (result.term.exited != 0) fatal(arg, "{s}", .{result.stderr});
             },
         }
 
         log.info("{s} converted successfully :)", .{arg});
     }
+}
+
+fn fatal(arg: []const u8, comptime fmt: []const u8, args: anytype) noreturn {
+    log.err("unable to convert {s} :(", .{arg});
+    std.debug.print(fmt, args);
+    std.process.exit(1);
 }
 
 const FileExtension = enum {
