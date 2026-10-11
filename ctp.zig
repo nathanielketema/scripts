@@ -63,7 +63,7 @@ pub fn main(init: std.process.Init) !void {
 
         switch (file_extension) {
             .doc, .docx, .pages => {
-                const script = try std.fmt.allocPrint(arena,
+                const script = try arena.print(
                     \\tell application "Pages"
                     \\    activate
                     \\    set the_document to open POSIX file "{s}"
@@ -81,7 +81,7 @@ pub fn main(init: std.process.Init) !void {
                 if (result.term.exited != 0) fatal(arg, "{s}", .{result.stderr});
             },
             .pptx => {
-                const script = try std.fmt.allocPrint(arena,
+                const script = try arena.print(
                     \\tell application "Keynote"
                     \\    activate
                     \\    set the_document to open POSIX file "{s}"

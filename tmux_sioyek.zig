@@ -9,7 +9,7 @@ pub fn main(init: std.process.Init) !void {
         .argv = &.{
             "tmux",
             "new-window",
-            try std.fmt.allocPrint(arena, "sioyek '{s}' --new-window", .{
+            try arena.print("sioyek '{s}' --new-window", .{
                 pdf_name,
             }),
         },

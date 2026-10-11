@@ -22,7 +22,7 @@ pub const Shell = struct {
     }
 
     pub fn spawn(shell: Shell, comptime fmt: []const u8, args: anytype) !void {
-        const command = try std.fmt.allocPrint(shell.arena, fmt, args);
+        const command = try shell.arena.print(fmt, args);
 
         var it = std.mem.tokenizeScalar(u8, command, ' ');
         var argv: std.ArrayList([]const u8) = .empty;
@@ -44,7 +44,7 @@ pub const Shell = struct {
         comptime fmt: []const u8,
         args: anytype,
     ) !std.process.RunResult {
-        const command = try std.fmt.allocPrint(shell.arena, fmt, args);
+        const command = try shell.arena.print(fmt, args);
 
         var it = std.mem.tokenizeScalar(u8, command, ' ');
         var argv: std.ArrayList([]const u8) = .empty;
@@ -204,7 +204,7 @@ pub const Snapshot = struct {
     }
 
     pub fn diff_fmt(want: *const Snapshot, comptime fmt: []const u8, fmt_args: anytype) !void {
-        const got = try std.fmt.allocPrint(testing.allocator, fmt, fmt_args);
+        const got = try testing.allocator.print(fmt, fmt_args);
         defer testing.allocator.free(got);
         try want.diff(got);
     }

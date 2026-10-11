@@ -102,7 +102,7 @@ pub const Context = struct {
             ctx.home("work/"),
             ctx.home("misc/"),
             ctx.home("personal/notes/"),
-            ctx.home("git-clone/"),
+            ctx.home("cloned/"),
             "-mindepth",
             "1",
             "-maxdepth",
@@ -118,7 +118,7 @@ pub const Context = struct {
             \\school
             \\misc
             \\work
-            \\git-clone
+            \\cloned
             \\
         ;
         return ctx.shell.pipeline(&.{
