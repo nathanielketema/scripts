@@ -14,7 +14,6 @@ const Context = struct {
     home_path: []const u8,
 };
 
-// Won't work for file names with spaces!
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const arena = init.arena.allocator();
@@ -31,6 +30,7 @@ pub fn main(init: std.process.Init) !void {
             fatal("error: couldn't find home path\n", .{}),
     };
 
+    // Won't work for file names with spaces!
     const selected_path = try select_path(ctx, args.next());
     try sessionize(ctx, selected_path);
 }
