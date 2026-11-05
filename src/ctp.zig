@@ -7,7 +7,7 @@ const testing = std.testing;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
-const Shell = @import("include/stdx.zig").Shell;
+const Shell = @import("./stdx.zig").Shell;
 
 const usage =
     \\ctp (Change To PDF)

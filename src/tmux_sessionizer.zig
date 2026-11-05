@@ -1,10 +1,11 @@
+//usr/bin/env zig run "$0" -- "$@"; exit
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const process = std.process;
 
-const Shell = @import("include/stdx.zig").Shell;
+const Shell = @import("./stdx.zig").Shell;
 
 const Context = struct {
     io: Io,

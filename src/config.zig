@@ -1,13 +1,14 @@
 //usr/bin/env zig run "$0" -- "$@"; exit
 const std = @import("std");
+const Io = std.Io;
 const assert = std.debug.assert;
 
-const stdx = @import("include/stdx.zig");
-const Shell = stdx.Shell;
+const Shell = @import("./stdx.zig").Shell;
 
-const Io = std.Io;
-
-const Error = error{ InvalidArguments, InvalidCommand };
+const Error = error{
+    InvalidArguments,
+    InvalidCommand,
+};
 
 const usage =
     \\Usage: config <command>
@@ -51,7 +52,7 @@ pub fn stow(shell: Shell, env: *std.process.Environ.Map) !void {
         shell.io,
         .{ .argv = &.{ "stow", "--version" } },
     );
-    if(result.term.exited != 0) return error.StowNotInstalled;
+    if (result.term.exited != 0) return error.StowNotInstalled;
 
     const dot_files_path = env.get("DOTFILES") orelse return error.Env_DOTFILES_NotFound;
     const dir = try Io.Dir.openDir(.cwd(), shell.io, dot_files_path, .{ .iterate = true });
@@ -82,10 +83,6 @@ const Input = struct {
     pub fn parse(input: []const [:0]const u8) !Input {
         if (input.len != 2) return Error.InvalidArguments;
         const command = Command.from_string(input[1]) orelse return Error.InvalidCommand;
-
-        return .{
-            .command = command,
-        };
+        return .{ .command = command };
     }
 };
-
