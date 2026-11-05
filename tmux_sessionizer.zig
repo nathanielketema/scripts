@@ -105,7 +105,6 @@ fn select_directory(ctx: Context) []const u8 {
         home(ctx, "school/dsu/4-fall-2026/"),
         home(ctx, "work/"),
         home(ctx, "misc/"),
-        home(ctx, "personal/notes/"),
         home(ctx, "cloned/"),
         "-mindepth",
         "1",
